@@ -1,5 +1,4 @@
-import math
-from builtins import range
+from builtins import range, zip
 
 import numpy as np
 import astropy.units as u
@@ -39,10 +38,10 @@ def plot_channel_maps(args):
             projection=cubewcs, **opts)
 
     # Get vmin and vmax
-    if args.image is not None:
-        data = np.squeeze(args.image.data)
-        unit = u.Unit(args.image.header['BUNIT'])
-        imagewcs = WCS(args.image.header).sub(('longitude','latitude'))
+    if len(args.images) == 1:
+        data = np.squeeze(args.images[0].data)
+        unit = u.Unit(args.images[0].header['BUNIT'])
+        imagewcs = WCS(args.images[0].header).sub(('longitude','latitude'))
     else:
         data = args.cube.unmasked_data[ichans,:,:].value
     vmin, vmax = auto_vminmax(data)
@@ -70,7 +69,7 @@ def plot_channel_maps(args):
         cbar = ichans.index(i)==0
         ax = fig.get_mapper(ax, include_cbar=cbar, vmin=vmin, vmax=vmax, a=a)
 
-        if args.image is None:
+        if len(args.images) == 0:
             data = args.cube.unmasked_data[i,:,:].value
             unit = args.cube.unmasked_data[i,:,:].unit
             wcs = cubewcs

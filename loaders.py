@@ -10,11 +10,14 @@ def load_cube(args):
     return args
 
 def load_fits(args):
-    from astropy.io import fits
-    if args.imagename:
-        args.image = fits.open(os.path.expanduser(args.imagename[0]))[0]
+    if args.imagenames:
+        for img in args.imagenames:
+            args.images += [get_fits(img)]
     else:
-        args.image = None
+        args.images = None
 
     return args
 
+def get_fits(filename):
+    from astropy.io import fits
+    return fits.open(os.path.expanduser(filename))[0]
