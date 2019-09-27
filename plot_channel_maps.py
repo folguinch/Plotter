@@ -2,12 +2,13 @@ from builtins import range, zip
 
 import numpy as np
 import astropy.units as u
+from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 
 from src.map_plotter import MapsPlotter
 from src.utils import auto_vminmax, auto_levels
-from utils import get_shape
+from utils import all_mapfig_setup, plot_single_map, get_shape
 
 def plot_channel_maps(args):
     # Number of channels
@@ -36,18 +37,18 @@ def plot_channel_maps(args):
     cubewcs = args.cube.wcs.sub(('longitude','latitude'))
     fig = MapsPlotter(config=args.config[0], section=args.section[0],
             projection=cubewcs, **opts)
+    cen, radius, markers, orientation = all_mapfig_setup(fig)
 
-    # Get vmin and vmax
+    # Get global vmin and vmax
     if len(args.images) == 1:
-        data = np.squeeze(args.images[0].data)
-        unit = u.Unit(args.images[0].header['BUNIT'])
-        imagewcs = WCS(args.images[0].header).sub(('longitude','latitude'))
+        img = args.images[0]
+        data = np.squeeze(img.data)
     else:
         data = args.cube.unmasked_data[ichans,:,:].value
     vmin, vmax = auto_vminmax(data)
-    vmin = fig.config.get('vmin', fallback=vmin)
-    vmax = fig.config.get('vmax', fallback=vmax)
-    a = fig.config.get('a', fallback=100)
+    vmin = fig.config.getfloat('vmin', fallback=vmin)
+    vmax = fig.config.getfloat('vmax', fallback=vmax)
+    a = fig.config.getfloat('a', fallback=100)
 
     # Levels
     levels = auto_levels(args.cube.unmasked_data[ichans,:,:].value,
@@ -55,48 +56,36 @@ def plot_channel_maps(args):
             stretch=fig.config.get('stretch', fallback='log'))
     print(levels)
 
-    # Center position
-    if 'center' in fig.config and 'radius' in fig.config:
-        cen = SkyCoord(fig.config['center'], unit=(u.hourangle, u.deg),
-                frame='fk5')
-        radius = fig.config['radius'].split()
-        radius = float(radius[0]) * u.Unit(radius[1])
-    else:
-        cen = radius = None
-
     # Plot
     for ax,i in zip(fig.axes, ichans):
         cbar = ichans.index(i)==0
-        ax = fig.get_mapper(ax, include_cbar=cbar, vmin=vmin, vmax=vmax, a=a)
+        #ax = fig.get_mapper(ax, include_cbar=cbar, vmin=vmin, vmax=vmax, a=a)
+        bmaj = args.cube.beams[i].major.to(u.deg).value
+        bmin = args.cube.beams[i].minor.to(u.deg).value
+        bpa = args.cube.beams[i].pa.to(u.deg).value
 
         if len(args.images) == 0:
-            data = args.cube.unmasked_data[i,:,:].value
-            unit = args.cube.unmasked_data[i,:,:].unit
-            wcs = cubewcs
-            contours = contours_wcs = None
+            img = fits.PrimaryHDU(args.cube.unmasked_data[i,:,:].value,
+                    header=cubewcs.to_header())
+            img.header['BMAJ'] = bmaj
+            img.header['BMIN'] = bmin
+            img.header['BPA'] = bpa
+            img.header['BUNIT'] = args.cube.header['BUNIT']
+            contours = None
         else:
-            contours = args.cube.unmasked_data[i,:,:].value
-            contours_wcs = cubewcs
-            wcs = imagewcs
+            contours = fits.PrimaryHDU(args.cube.unmasked_data[i,:,:].value,
+                    header=cubewcs.to_header())
+            contours.header['BMAJ'] = bmaj
+            contours.header['BMIN'] = bmin
+            contours.header['BPA'] = bpa
 
-        lev_color = 'w'
-
-        ax.plot_map(data, wcs=wcs, r=radius, position=cen, contours=contours,
-                contours_wcs=contours_wcs, levels=levels, colors=lev_color)
-        
-        # Color bar
-        if cbar:
-            orientation = 'horizontal' if fig.config.getboolean('hcbar') else \
-                    'vertical'
-            ax.plot_cbar(fig.fig, 
-                    label='Intensity (%s)' % unit.to_string('latex_inline'),
-                    orientation=orientation)
-
-        # Velocity labels
         label = '%.2f %s' % (vel[i].value, vel.unit.to_string('latex_inline'))
-        ax.annotate(label, xy=(0.1,0.9), xytext=(0.1,0.9),
-                xycoords='axes fraction', zorder=3, color='k', 
-                backgroundcolor='w')
+
+        ax = plot_single_map(ax, fig, img, contours=contours, cen=cen, 
+                radius=radius, levels=levels, 
+                cbar_orientation=orientation if cbar else None,
+                markers=markers, axlabel=label, vmin=vmin, vmax=vmax, a=a,
+                include_cbar=cbar)
 
     fig.auto_config()
 

@@ -1,7 +1,7 @@
 from builtins import zip
 
 from src.map_plotter import MapsPlotter
-from utils import all_mapfig_setup, plot_single_map, get_shape
+from utils import all_mapfig_setup, plot_single_map, get_shape, get_overplots, get_axis_label
 
 def plot_maps(args):
     # Keyword arguments for tile plotter
@@ -16,11 +16,14 @@ def plot_maps(args):
     cen, radius, markers, orientation = all_mapfig_setup(fig)
 
     # Iterate over images
-    for ax, img in zip(fig.axes, args.images):
-        ax = plot_single_map(ax, fig, img, cen=cen, radius=radius,
-                self_levels=True, cbar_orientation=orientation,
-                markers=markers)
+    for i,(loc, img) in enumerate(zip(fig.axes, args.images)):
+        label = fig.get_value('axlabel', None, loc, sep=',')
+        label = get_axis_label(args, i, label)
+        overplots = get_overplots(args, i)
+        ax = plot_single_map(loc, fig, img, contours=overplots, cen=cen, 
+                radius=radius, self_contours=args.selflevels, cbar_orientation=orientation,
+                markers=markers, axlabel=label)
 
-    fig.auto_config()
+    fig.auto_config(legend=args.legend)
 
     return fig

@@ -29,11 +29,12 @@ def plot_moments(args):
 
     # Iterate over images
     peak = None
-    for i,(ax,mom,img) in enumerate(zip(fig.axes, args.moments, args.images)):
-        label = get_axis_label(args, i, get_axlabel(mom))
+    for i,(loc,mom,img) in enumerate(zip(fig.axes, args.moments, args.images)):
+        label = fig.get_value('axlabel', get_axlabel(mom), loc, sep=',')
+        label = get_axis_label(args, i, label)
         if mom != 1:
-            ax = plot_single_map(ax, fig, img, cen=cen, radius=radius,
-                    self_levels=True, cbar_orientation=orientation,
+            ax = plot_single_map(loc, fig, img, cen=cen, radius=radius,
+                    self_contours=True, cbar_orientation=orientation,
                     markers=markers, axlabel=label)
             if mom==0:
                 peak = np.unravel_index(np.nanargmax(np.squeeze(img.data)),
@@ -49,7 +50,7 @@ def plot_moments(args):
             img.data = img.data - vel_shift
 
             with plt.style.context('bwr'):
-                ax = plot_single_map(ax, fig, img, cen=cen, radius=radius,
+                ax = plot_single_map(loc, fig, img, cen=cen, radius=radius,
                         self_levels=True, cbar_orientation=orientation,
                         markers=markers, dtype='velocity',
                         skip_marker_label=args.moments.index(mom)>0,

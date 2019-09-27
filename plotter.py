@@ -17,11 +17,18 @@ def main():
             help='Save also as png')
     parser.add_argument('--axlabel', action='store_true',
             help='Automatic select axis labels')
+    parser.add_argument('--legend', action='store_true',
+            help='Plot legend')
+    parser.add_argument('--overplot', nargs='*', default=None,
+            help="Overplot files (extension dependent)")
+    parser.add_argument('--oplabel', metavar='LABEL', nargs='*', default=None,
+            help="Overplot label for legend")
+    parser.add_argument('--opcolor', metavar='COLOR', nargs='*', default=None,
+            help="Overplot colors")
     parser.add_argument('config', nargs=1,
             help='Plot configuration file')
     parser.add_argument('plotname', nargs=1,
             help='Plot file name')
-    parser.set_defaults(post=postprocess, cube=None, images=[])
     group1 = parser.add_mutually_exclusive_group(required=False)
     group1.add_argument('--shape', metavar=('ROWS','COLS'), nargs=2, 
             default=None, type=int,
@@ -35,6 +42,12 @@ def main():
             help='Automatic detailed axis labels')
     group3.add_argument('--axlabels', nargs='*', default=None,
             help='Axis labels (one per each image)')
+    group4 = parser.add_mutually_exclusive_group(required=False)
+    group4.add_argument('--overall', action='store_true',
+            help='Plot all overplots over each image')
+    group4.add_argument('--opmapping', nargs='*', type=int,
+            help='Indices of axes where to plot the overplots')
+    parser.set_defaults(post=postprocess, cube=None, images=[], overplots=[])
     # Subparsers
     # Plot: channel maps
     chanmaps = subparsers.add_parser('chanmap', 
@@ -60,6 +73,8 @@ def main():
             help="Plot FITS maps")
     plotmaps.add_argument('--section', nargs=1, default=['maps_plots'],
             help="Section of the config file")
+    parser.add_argument('--selflevels', action='store_true',
+            help='Plot contours from input image')
     plotmaps.add_argument('imagenames', nargs='*',
             help="List of images to plot")
     plotmaps.set_defaults(func=plot_maps, loaders=[load_fits])
@@ -80,6 +95,7 @@ def main():
     args = parser.parse_args()
     for loader in args.loaders:
         args = loader(args)
+    args = load_overplot(args)
     figure = args.func(args)
     args.post(figure, args)
 

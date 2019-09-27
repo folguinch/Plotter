@@ -12,7 +12,7 @@ def postprocess(fig, args):
     plotname = os.path.expanduser(args.plotname[0])
     fig.savefig(plotname)
     if args.png:
-        plotname = os.path.splitext(plotname)[1] + '.png'
+        plotname = os.path.splitext(plotname)[0] + '.png'
         fig.savefig(plotname)
 
 def get_shape(args, total, default_cols=3):
@@ -52,7 +52,8 @@ def get_center(fig):
 
     return cen, radius
 
-def get_markers(config):
+def get_markers(fig):
+    config = fig.config
     markers = []
     for i, m in enumerate(config.get('markers', fallback='').split(',')):
         if m == '':
@@ -63,14 +64,10 @@ def get_markers(config):
                     fallback='x').replace(',',' ').split()[i]
         except IndexError:
             marker['style'] = 'x'
-        try:
-            marker['color'] = config.get('mcolors', 
-                    fallback='r').replace(',',' ').split()[i]
-        except IndexError:
-            marker['color'] = 'r'
+        marker['color'] = fig.get_value('mcolors', 'r', n=i, sep=',')
         try:
             marker['label'] = config.get('mlabels',
-                    fallback=None).split(',')[i]
+                    fallback=None).split(',')[i].strip()
             try:
                 loclabel = config.get('mlabloc', 
                         fallback=None).split(',')
@@ -82,9 +79,37 @@ def get_markers(config):
             pass
         except IndexError:
             marker['label'] = ''
+        try:
+            marker['legend'] = config.get('mlegend', 
+                    fallback=None).split(',')[i].strip()
+        except AttributeError:
+            marker['legend'] = None
+        except IndexError:
+            marker['legend'] = None
+        if marker['legend']=='-' or marker['legend']=='':
+            marker['legend'] = None
         markers += [marker]
 
     return markers
+
+def get_overplots(args, n):
+    if args.overplots:
+        if args.overall:
+            over = args.overplots
+        elif n in args.opmapping:
+            assert len(args.opmapping)==len(args.overplots[0])
+            over = [args.overplots[0][i] \
+                    for i, j in enumerate(args.opmapping) if j==n]
+            over = [over, args.overplots[1], args.overplots[2]]
+        else:
+            try:
+                over = args.overplots[0][n]
+                over = [[over], args.overplots[1], args.overplots[2]]
+            except IndexError:
+                over = None
+    else:
+        over = None
+    return over
 
 def all_mapfig_setup(fig):
     # Center position
@@ -94,7 +119,7 @@ def all_mapfig_setup(fig):
     orientation = get_cbar_orientation(fig)
 
     # Markers
-    markers = get_markers(fig.config)
+    markers = get_markers(fig)
 
     return cen, radius, markers, orientation 
 
@@ -118,40 +143,62 @@ def get_axis_label(args, n, detail):
 
     return label
 
-def plot_single_map(ax, fig, img, cen=None, radius=None, 
-        dtype='intensity', self_levels=True, cbar_orientation=None, 
-        markers=None, skip_marker_label=False, axlabel=None):
+def plot_single_map(loc, fig, img, contours=None, cen=None, radius=None, 
+        dtype='intensity', levels=None, self_contours=True, cbar_orientation=None,
+        markers=None, skip_marker_label=False, axlabel=None,
+        **kwargs):
+
     # Data
     data = np.squeeze(img.data)
     unit = u.Unit(img.header['BUNIT'])
     wcs = WCS(img.header).sub(('longitude','latitude'))
+    cbarlabel = '%s (%s)' % (dtype.capitalize(), unit.to_string('latex_inline'))
 
     # Get vmin and vmax
-    vmin, vmax = auto_vminmax(data, dtype=dtype)
-    vmin = float(fig.get_value('vmin', vmin, ax))
-    vmax = float(fig.get_value('vmax', vmax, ax))
-    a = fig.config.getfloat('a', fallback=100)
+    if 'vmin' in kwargs and 'vmax' in kwargs and 'a' in kwargs:
+        vmin = kwargs['vmin']
+        vmax = kwargs['vmax']
+    else:
+        vmin, vmax = auto_vminmax(data, dtype=dtype)
+        vmin = float(fig.get_value('vmin', vmin, loc))
+        vmax = float(fig.get_value('vmax', vmax, loc))
+    print(vmin, vmax)
+
+    # Create axis, auto determine if cbar is needed
+    ax = fig.get_mapper(loc, vmin=vmin, vmax=vmax, a=kwargs.get('a'), 
+            projection=wcs, include_cbar=kwargs.get('include_cbar'))
 
     # Levels
-    if not self_levels or dtype == 'velocity':
+    nlevels = fig.config.getint('nlevels', fallback=10)
+    if not self_contours or dtype=='velocity':
         levels = None
+    elif levels is not None:
+        pass
     else:
-        levels = fig.get_value('levels', None, ax, sep=',')
+        levels = fig.get_value('levels', levels, loc, sep=',')
         if levels is not None:
             levels = map(float, levels.split())
         else:
-            levels = auto_levels(data,
-                    n=fig.config.getint('nlevels', fallback=10), 
-                    stretch=fig.config.get('stretch', fallback='log'))
+            pass
     print(levels)
-    lev_color = fig.config.get('level_color', fallback='w')
-
-    # Create axis, auto determine if cbar is needed
-    ax = fig.get_mapper(ax, vmin=vmin, vmax=vmax, a=a, projection=wcs)
 
     # Plot data
-    ax.plot_map(data, wcs=wcs, r=radius, position=cen, contours=data,
-            contours_wcs=wcs, levels=levels, colors=lev_color)
+    lev_color = kwargs.get('contour_color', 
+            fig.config.get('contour_color', fallback='w'))
+    self_levs = ax.plot_map(data, wcs=wcs, r=radius, position=cen,
+            self_contours=self_contours and dtype!='velocity', 
+            levels=levels, colors=lev_color,
+            label=cbarlabel, nlevels=nlevels)
+    if self_contours and levels is None:
+        levels = self_levs
+        print(levels)
+
+    # Plot contours
+    if contours is not None and dtype!='velocity':
+        if not self_contours and levels is None:
+            levels = auto_levels(None, vmin=contours[1], vmax=contours[2],
+                    stretch=ax.stretch, n=nlevels)
+        plot_contours(ax, contours[0], levels)
 
     # Plot markers
     if markers is not None:
@@ -159,9 +206,8 @@ def plot_single_map(ax, fig, img, cen=None, radius=None,
 
     # Color bar
     if cbar_orientation is not None:
-        ax.plot_cbar(fig.fig, 
-                label='Intensity (%s)' % unit.to_string('latex_inline'),
-                orientation=cbar_orientation)
+        ax.plot_cbar(fig.fig, orientation=cbar_orientation,
+                labelpad=fig.config.getfloat('labelpad', fallback=10))
 
     # Axis label
     if axlabel:
@@ -170,6 +216,21 @@ def plot_single_map(ax, fig, img, cen=None, radius=None,
 
     # Beam
     if 'BMAJ' in img.header and 'BMIN' in img.header and 'BPA' in img.header:
-        ax.plot_beam(img.header)
+        color = fig.get_value('beamcolor', 'w', loc)
+        ax.plot_beam(img.header, color=color)
+
+    # Legend
+    #if legend:
+    #    ax.legend(auto=True, loc=4, match_colors=True,
+    #            fancybox=fig.config.getboolean('fancybox', fallback=False),
+    #            framealpha=fig.config.getfloat('framealpha', fallback=None),
+    #            facecolor=fig.config.get('facecolor', fallback=None))
 
     return ax
+
+def plot_contours(ax, contours, levels, zorder=2):
+    for j,(img,opt) in enumerate(contours):
+        data = np.squeeze(img.data)
+        wcs = WCS(img.header).sub(('longitude','latitude'))
+        ax.plot_contours(data, levels, wcs=wcs, zorder=zorder+j, **opt)
+
