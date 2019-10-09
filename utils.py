@@ -6,6 +6,7 @@ from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 
 from src.utils import auto_vminmax, auto_levels
+from src.logger import get_logger
 
 def postprocess(fig, args):
     # Save figure
@@ -14,6 +15,12 @@ def postprocess(fig, args):
     if args.png:
         plotname = os.path.splitext(plotname)[0] + '.png'
         fig.savefig(plotname)
+
+def get_quantity(x):
+    return _get_quantity(*tuple(x.split()))
+
+def _get_quantity(x,y):
+    return float(x)*u.Unit(y)
 
 def get_shape(args, total, default_cols=3):
     if args.shape:
@@ -65,6 +72,7 @@ def get_markers(fig):
         except IndexError:
             marker['style'] = 'x'
         marker['color'] = fig.get_value('mcolors', 'r', n=i, sep=',')
+        marker['size'] = float(fig.get_value('msizes', 50, n=i))
         try:
             marker['label'] = config.get('mlabels',
                     fallback=None).split(',')[i].strip()
@@ -78,6 +86,8 @@ def get_markers(fig):
         except AttributeError:
             pass
         except IndexError:
+            marker['label'] = ''
+        if marker['label']=='-':
             marker['label'] = ''
         try:
             marker['legend'] = config.get('mlegend', 
@@ -143,11 +153,10 @@ def get_axis_label(args, n, detail):
 
     return label
 
-def plot_single_map(loc, fig, img, contours=None, cen=None, radius=None, 
+def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None, 
         dtype='intensity', levels=None, self_contours=True, cbar_orientation=None,
         markers=None, skip_marker_label=False, axlabel=None,
         **kwargs):
-
     # Data
     data = np.squeeze(img.data)
     unit = u.Unit(img.header['BUNIT'])
@@ -155,16 +164,18 @@ def plot_single_map(loc, fig, img, contours=None, cen=None, radius=None,
     cbarlabel = '%s (%s)' % (dtype.capitalize(), unit.to_string('latex_inline'))
 
     # Get vmin and vmax
-    if 'vmin' in kwargs and 'vmax' in kwargs and 'a' in kwargs:
+    if kwargs.get('vmin') is not None and kwargs.get('vmax') is not None:
         vmin = kwargs['vmin']
         vmax = kwargs['vmax']
     else:
         vmin, vmax = auto_vminmax(data, dtype=dtype)
         vmin = float(fig.get_value('vmin', vmin, loc))
         vmax = float(fig.get_value('vmax', vmax, loc))
-    print(vmin, vmax)
+    logger.info('Plotting data with vmin, vmax: %.3e, %.3e', vmin, vmax)
 
     # Create axis, auto determine if cbar is needed
+    logger.info('Creating axis with%s color bar',
+            ['out',''][int(kwargs.get('include_cbar', False))])
     ax = fig.get_mapper(loc, vmin=vmin, vmax=vmax, a=kwargs.get('a'), 
             projection=wcs, include_cbar=kwargs.get('include_cbar'))
 
@@ -205,14 +216,14 @@ def plot_single_map(loc, fig, img, contours=None, cen=None, radius=None,
         ax.plot_markers(markers, skip_label=skip_marker_label)
 
     # Color bar
-    if cbar_orientation is not None:
+    if fig.has_cbar(loc) and cbar_orientation is not None:
         ax.plot_cbar(fig.fig, orientation=cbar_orientation,
                 labelpad=fig.config.getfloat('labelpad', fallback=10))
 
     # Axis label
     if axlabel:
         ax.annotate(axlabel, xy=(0.1,0.9), xytext=(0.1,0.9), 
-            xycoords='axes fraction', color='k', backgroundcolor='w')
+            xycoords='axes fraction', color='k', backgroundcolor='w', zorder=3)
 
     # Beam
     if 'BMAJ' in img.header and 'BMIN' in img.header and 'BPA' in img.header:
