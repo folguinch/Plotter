@@ -18,7 +18,7 @@ def plot_from_cube_parser():
     parser.add_argument('--every', metavar='STEP', nargs=1, default=[1],
             type=int,
             help="Step between channels for range")
-    parser.add_argument('--save_moments', nargs=1,
+    parser.add_argument('--save_moments', nargs=1, default=[None],
             help="Moments base file name")
     parser.add_argument('--line_list', nargs='*',
             help="Lines to plot (default all in config)")

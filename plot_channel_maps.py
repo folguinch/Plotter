@@ -76,19 +76,22 @@ def plot_channel_maps(args):
     cen, radius, markers, orientation = all_mapfig_setup(fig)
 
     # Get global vmin and vmax
-    if len(args.images) == 1:
+    if args.images is None:
+        data = args.cube.unmasked_data[ichans,:,:].value
+    elif len(args.images) == 1:
         args.logger.debug('Using input background image')
         img = args.images[0]
         data = np.squeeze(img.data)
     else:
-        data = args.cube.unmasked_data[ichans,:,:].value
+        raise NotImplementedError
+
     vmin, vmax = auto_vminmax(data)
     vmin = fig.config.getfloat('vmin', fallback=vmin)
     vmax = fig.config.getfloat('vmax', fallback=vmax)
     args.logger.info('Cube vmin, vmax = %.3e, %.3e', vmin, vmax)
 
     # Levels
-    if len(args.images) == 1:
+    if args.images is not None and len(args.images) == 1:
         vminline = fig.config.getfloat('vminline', fallback=None)
         vmaxline = fig.config.getfloat('vmaxline', fallback=None)
     else:
@@ -108,7 +111,7 @@ def plot_channel_maps(args):
         bmin = args.cube.beams[i].minor.to(u.deg).value
         bpa = args.cube.beams[i].pa.to(u.deg).value
 
-        if len(args.images) == 0:
+        if args.images is None or len(args.images) == 0:
             self_contours = True
             img = fits.PrimaryHDU(args.cube.unmasked_data[i,:,:].value,
                     header=cubewcs.to_header())

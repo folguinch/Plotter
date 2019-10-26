@@ -87,7 +87,7 @@ def get_markers(fig):
             pass
         except IndexError:
             marker['label'] = ''
-        if marker['label']=='-':
+        if marker.get('label')=='-':
             marker['label'] = ''
         try:
             marker['legend'] = config.get('mlegend', 
@@ -188,10 +188,14 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
     else:
         levels = fig.get_value('levels', levels, loc, sep=',')
         if levels is not None:
-            levels = map(float, levels.split())
+            try:
+                levels = map(float, levels.split())
+                nlevels = len(levels)
+            except:
+                self_contours = False
         else:
             pass
-    print(levels)
+    logger.info('Levels: %r', levels)
 
     # Plot data
     lev_color = kwargs.get('contour_color', 
