@@ -121,6 +121,50 @@ def get_overplots(args, n):
         over = None
     return over
 
+def get_levels(data, loc, fig, levels=None, self_contours=True, nlevels=10,
+        dtype='intensity', logger=None, base=2):
+    nlevels = fig.config.getint('nlevels', fallback=nlevels)
+    if not self_contours or dtype=='velocity':
+        levels = None
+    elif levels is not None:
+        pass
+    elif 'rms' in fig.config:
+        # Levels as multiples of the rms
+        rms = float(fig.get_value('rms', ax=loc))
+        nsigma = int(fig.get_value('nsigma', default=5, ax=loc))
+        baselevel = rms*nsigma
+        maxval = np.nanmax(data)
+        maxnlevel = int(np.floor(maxval/baselevel))
+        
+        # Geometric progression
+        aux = []
+        i = 1
+        while i*nsigma<=maxnlevel:
+            aux += [i*nsigma]
+            i = i * base
+
+        # Log
+        if logger:
+            logger.info('Determining levels from data:')
+            logger.info('Maximum/rms = %i', maxnlevel)
+            logger.info('Levels/rms = %r', aux)
+
+        # Levels    
+        levels = np.array(aux) * rms
+    else:
+        levels = fig.get_value('levels', levels, loc, sep=',')
+        if levels is not None:
+            try:
+                levels = map(float, levels.split())
+                nlevels = len(levels)
+            except:
+                if logger is not None:
+                    logger.warn('Could not determine levels')
+                self_contours = False
+        else:
+            pass
+    return levels, self_contours, nlevels
+
 def all_mapfig_setup(fig):
     # Center position
     cen, radius = get_center(fig)
@@ -180,21 +224,8 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
             projection=wcs, include_cbar=kwargs.get('include_cbar'))
 
     # Levels
-    nlevels = fig.config.getint('nlevels', fallback=10)
-    if not self_contours or dtype=='velocity':
-        levels = None
-    elif levels is not None:
-        pass
-    else:
-        levels = fig.get_value('levels', levels, loc, sep=',')
-        if levels is not None:
-            try:
-                levels = map(float, levels.split())
-                nlevels = len(levels)
-            except:
-                self_contours = False
-        else:
-            pass
+    levels, self_contours, nlevels = get_levels(data, loc, fig, levels=levels,
+            self_contours=self_contours, dtype=dtype, logger=logger)
     logger.info('Levels: %r', levels)
 
     # Plot data
