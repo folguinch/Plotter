@@ -7,7 +7,7 @@ def get_level(args):
         raise ValueError('Invalid log level: %s' % args.loglevel[0])
     return numeric_level
 
-def get_logger(name, args, file_name='plotter.log'):
+def get_logger(name, args=None, file_name='plotter.log'):
     """Creates a new logger.
 
     Parameters:
@@ -39,8 +39,11 @@ def get_logger(name, args, file_name='plotter.log'):
 
         # Stream handler
         sh = logging.StreamHandler()
-        sh.setLevel(get_level(args))
-        if args.loglevel[0].lower()=='debug':
+        if args is not None:
+            sh.setLevel(get_level(args))
+        else:
+            sh.setLevel(logging.INFO)
+        if args is not None and args.loglevel[0].lower()=='debug':
             streamfmt = '%(levelname)s - %(filename)s (%(funcName)s): %(message)s'
         else:
             streamfmt = '%(levelname)s: %(message)s'
@@ -50,7 +53,11 @@ def get_logger(name, args, file_name='plotter.log'):
         logger.addHandler(fh)
         logger.addHandler(sh)
 
-    args.logger = logger
+    if args is not None:
+        args.logger = logger
+        return args
+    else:
+        return logger
 
 def logger_from_config(file_name):
    pass 

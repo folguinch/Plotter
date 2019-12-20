@@ -1,5 +1,11 @@
 import os
 
+import numpy as np
+#try:
+from myutils.array_utils import load_mixed_struct_array as data_loader
+#except ImportError:
+#    data_loader = np.loadtxt
+
 from src.utils import auto_vminmax
 
 def load_cube(args):
@@ -40,7 +46,6 @@ def load_overplot(args):
         else:
             colors = ['w']*len(args.overplot)
                 
-        rmin, rmax = float('inf'), -float('inf')
         over = []
         for l,o,c in zip(labels, args.overplot, colors):
             ext = os.path.splitext(o)[1]
@@ -49,14 +54,17 @@ def load_overplot(args):
             if ext=='.fits':
                 img = get_fits(o)
                 over += [(img, d)]
-                vmin, vmax = get_img_ranges(img)
-                rmin = min(rmin, vmin)
-                rmax = max(rmin, vmax)
             elif ext=='.dat':
                 over += [(get_dat(o), d)]
             else:
                 raise NotImplementedError
-        args.overplots = [over, rmin, rmax]
+        args.overplots = over
+    return args
+
+def load_data(args):
+    for filename in args.filenames:
+        args.logger.info('Loading: %s', filename)
+        args.data += [data_loader(os.path.expanduser(filename))]
     return args
 
 def get_fits(filename):
@@ -64,9 +72,5 @@ def get_fits(filename):
     return fits.open(os.path.expanduser(filename))[0]
 
 def get_dat(filename):
-    import numpy as np
     return np.loadtxt(os.path.expanduser(filename))
-
-def get_img_ranges(img):
-    return auto_vminmax(img.data)
 

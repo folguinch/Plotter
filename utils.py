@@ -26,11 +26,11 @@ def get_shape(args, total, default_cols=3):
     if args.shape:
         rows, cols = args.shape
     elif args.rows:
-        rows = args.rows
+        rows = args.rows[0]
         cols = math.ceil(float(total)/rows)
     elif args.cols:
-        rows = math.ceil(float(total)/args.cols)
-        cols = args.cols
+        rows = math.ceil(float(total)/args.cols[0])
+        cols = args.cols[0]
     else:
         cols = default_cols
         rows = math.ceil(float(total)/cols)
@@ -50,12 +50,17 @@ def get_cbar_orientation(fig):
 
 def get_center(fig):
     if 'center' in fig.config and 'radius' in fig.config:
-        cen = SkyCoord(fig.config['center'], unit=(u.hourangle, u.deg),
-                frame='fk5')
-        radius = fig.config['radius'].split()
-        radius = float(radius[0]) * u.Unit(radius[1])
+        cens = fig.config['center'].split(',')
+        cen = []
+        for c in cens:
+            cen += [SkyCoord(c, unit=(u.hourangle, u.deg), frame='fk5')]
+        radii = fig.config['radius'].split(',')
+        radius = []
+        for r in radii:
+            rr = r.split()
+            radius += [float(rr[0]) * u.Unit(rr[1])]
     else:
-        cen = radius = None
+        cen = radius = [None]
 
     return cen, radius
 
@@ -107,10 +112,10 @@ def get_overplots(args, n):
         if args.overall:
             over = args.overplots
         elif n in args.opmapping:
-            assert len(args.opmapping)==len(args.overplots[0])
-            over = [args.overplots[0][i] \
+            assert len(args.opmapping)==len(args.overplots)
+            over = [args.overplots[i] \
                     for i, j in enumerate(args.opmapping) if j==n]
-            over = [over, args.overplots[1], args.overplots[2]]
+            #over = [over, args.overplots[1], args.overplots[2]]
         else:
             try:
                 over = args.overplots[0][n]
@@ -121,9 +126,8 @@ def get_overplots(args, n):
         over = None
     return over
 
-def get_levels(data, loc, fig, levels=None, self_contours=True, nlevels=10,
+def get_levels(data, loc, fig, levels=None, self_contours=True, 
         dtype='intensity', logger=None, base=2):
-    nlevels = fig.config.getint('nlevels', fallback=nlevels)
     if not self_contours or dtype=='velocity':
         levels = None
     elif levels is not None:
@@ -132,38 +136,18 @@ def get_levels(data, loc, fig, levels=None, self_contours=True, nlevels=10,
         # Levels as multiples of the rms
         rms = float(fig.get_value('rms', ax=loc))
         nsigma = int(fig.get_value('nsigma', default=5, ax=loc))
-        baselevel = rms*nsigma
-        maxval = np.nanmax(data)
-        maxnlevel = int(np.floor(maxval/baselevel))
-        
-        # Geometric progression
-        aux = []
-        i = 1
-        while i*nsigma<=maxnlevel:
-            aux += [i*nsigma]
-            i = i * base
-
-        # Log
-        if logger:
-            logger.info('Determining levels from data:')
-            logger.info('Maximum/rms = %i', maxnlevel)
-            logger.info('Levels/rms = %r', aux)
-
-        # Levels    
-        levels = np.array(aux) * rms
     else:
         levels = fig.get_value('levels', levels, loc, sep=',')
         if levels is not None:
             try:
                 levels = map(float, levels.split())
-                nlevels = len(levels)
             except:
                 if logger is not None:
                     logger.warn('Could not determine levels')
                 self_contours = False
         else:
             pass
-    return levels, self_contours, nlevels
+    return levels, self_contours
 
 def all_mapfig_setup(fig):
     # Center position
@@ -178,10 +162,7 @@ def all_mapfig_setup(fig):
     return cen, radius, markers, orientation 
 
 def get_axis_label(args, n, detail):
-    if args.axlabel:
-        label = '(' + chr(ord('a')+n) + ')'
-    else:
-        label = ''
+    label = '(' + chr(ord('a')+n) + ')'
 
     if args.detailaxlabel:
         label = ('%s %s' % (label, detail)).strip()
@@ -198,21 +179,35 @@ def get_axis_label(args, n, detail):
     return label
 
 def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None, 
-        dtype='intensity', levels=None, self_contours=True, cbar_orientation=None,
-        markers=None, skip_marker_label=False, axlabel=None,
-        **kwargs):
+        dtype='intensity', levels=None, self_contours=True,
+        global_levels=False, cbar_orientation=None, markers=None, 
+        skip_marker_label=False, axlabel=None, **kwargs):
+    # Change default self_contours
+    if dtype=='velocity':
+        self_contours = False
+    if levels is not None:
+        global_levels = True
+    
     # Data
     data = np.squeeze(img.data)
     unit = u.Unit(img.header['BUNIT'])
     wcs = WCS(img.header).sub(('longitude','latitude'))
     cbarlabel = '%s (%s)' % (dtype.capitalize(), unit.to_string('latex_inline'))
+    cbarlabel = fig.get_value('cbarlabel', cbarlabel, loc)
+
+    # rms, nsigma
+    try:
+        rms = float(fig.get_value('rms', ax=loc))
+    except TypeError:
+        rms = None
+    nsigma = float(fig.get_value('nsigma', default=5., ax=loc))
 
     # Get vmin and vmax
     if kwargs.get('vmin') is not None and kwargs.get('vmax') is not None:
         vmin = kwargs['vmin']
         vmax = kwargs['vmax']
     else:
-        vmin, vmax = auto_vminmax(data, dtype=dtype)
+        vmin, vmax = auto_vminmax(data, dtype=dtype, rms=rms)
         vmin = float(fig.get_value('vmin', vmin, loc))
         vmax = float(fig.get_value('vmax', vmax, loc))
     logger.info('Plotting data with vmin, vmax: %.3e, %.3e', vmin, vmax)
@@ -224,27 +219,35 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
             projection=wcs, include_cbar=kwargs.get('include_cbar'))
 
     # Levels
-    levels, self_contours, nlevels = get_levels(data, loc, fig, levels=levels,
-            self_contours=self_contours, dtype=dtype, logger=logger)
-    logger.info('Levels: %r', levels)
+    #levels, self_contours = get_levels(data, loc, fig, levels=levels,
+    #        self_contours=self_contours, dtype=dtype, logger=logger)
+    #logger.info('Levels: %r', levels)
 
-    # Plot data
+    # Levels
+    if self_contours and global_levels and levels is None:
+        levels = auto_levels(data, rms=rms, nsigma=nsigma)
+    elif not self_contours and global_levels and levels is None:
+        nlevels = int(fig.get_value('nlevels', default=None, ax=loc))
+        if rms is not None and nlevels is not None:
+            levels = auto_levels(rms=rms, nsigma=nsigma, nlevels=nlevels)
+        else:
+            raise Exception('Could not determine global levels for contours')
     lev_color = kwargs.get('contour_color', 
             fig.config.get('contour_color', fallback='w'))
-    self_levs = ax.plot_map(data, wcs=wcs, r=radius, position=cen,
-            self_contours=self_contours and dtype!='velocity', 
-            levels=levels, colors=lev_color,
-            label=cbarlabel, nlevels=nlevels)
-    if self_contours and levels is None:
-        levels = self_levs
-        print(levels)
+
+    # Plot data
+    ax.plot_map(data, wcs=wcs, r=radius, position=cen, 
+            self_contours=self_contours, levels=levels, rms=rms, nsigma=nsigma,
+            colors=lev_color, label=cbarlabel)
 
     # Plot contours
-    if contours is not None and dtype!='velocity':
-        if not self_contours and levels is None:
-            levels = auto_levels(None, vmin=contours[1], vmax=contours[2],
-                    stretch=ax.stretch, n=nlevels)
-        plot_contours(ax, contours[0], levels)
+    if contours is not None:
+        if not self_contours and 'levels' in fig.config:
+            levels = map(float, 
+                    fig.get_value('levels', ax=loc, sep=',').split())
+        contour_rms = float(fig.get_value('rms_contour', default=None, ax=loc))
+        plot_contours(ax, contours, levels=levels, nsigma=nsigma,
+                rms=contour_rms)
 
     # Plot markers
     if markers is not None:
@@ -274,9 +277,67 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
 
     return ax
 
-def plot_contours(ax, contours, levels, zorder=2):
+def plot_contours(ax, contours, levels=None, nsigma=5., zorder=2, rms=None):
     for j,(img,opt) in enumerate(contours):
         data = np.squeeze(img.data)
         wcs = WCS(img.header).sub(('longitude','latitude'))
-        ax.plot_contours(data, levels, wcs=wcs, zorder=zorder+j, **opt)
+        ax.plot_contours(data, levels=levels, wcs=wcs, rms=rms, nsigma=nsigma, 
+                zorder=zorder+j, **opt)
+
+def splot(loc, fig, data, logger, overplots=[], cols=[0,1], errorcol=None):
+    # Axis
+    ax = fig.get_axis(loc)
+
+    # Iterate over data
+    xunit = None
+    yunit = None
+    if overplots is None:
+        overplots = []
+    for i, d in enumerate([data]+overplots):
+        # Error column
+        if errorcol is not None:
+            try:
+                try:
+                    err = d[:,errcol]
+                except TypeError:
+                    err = d[0][errcol]
+                    if yunit is None:
+                        yunit = d[1][errcol]
+                    else:
+                        err = err.to(yunit)
+                fmt = fig.get_value('pfmt', n=i)
+            except:
+                logger.warn('No error column')
+                err = None
+                fmt = fig.get_value('lfmt', n=i)
+        else:
+            err = None
+            fmt = fig.get_value('lfmt', n=i)
+
+        # Data
+        try:
+            # Normal array
+            x = d[:,cols[0]]
+            y = d[:,cols[1]]
+        except TypeError:
+            # Array with units
+            x = d[0][cols[0]]
+            if xunit is None:
+                xunit = d[1][cols[0]]
+            x = x * d[1][cols[0]]
+            x = x.to(xunit).value
+
+            y = d[0][cols[1]]
+            if yunit is None:
+                yunit = d[1][cols[1]]
+            y = y * d[1][cols[1]]
+            y = y.to(yunit).value
+        
+        # plot
+        if err is None:
+            ax.plot(x, y, fmt)
+        else:
+            raise NotImplementedError
+            #ax.errorbar(d[cols[0]], d[cols[1]])
+    return ax, xunit, yunit
 

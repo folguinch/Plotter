@@ -43,18 +43,40 @@ def global_parser():
     group3.add_argument('--opmapping', nargs='*', type=int,
             help='Indices of axes where to plot the overplots')
     parser.set_defaults(post=postprocess, cube=None, images=[], overplots=[],
-            logger=get_logger)
+            data=[], logger=get_logger)
 
     return parser
 
 def common_lines():
     parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('--lines', nargs='*', 
+            help="Lines to plot (default all in config)")
+    parser.add_argument('--lineconfig', nargs=1,
+            help="Configuration file of the desired lines")
     group1 = parser.add_mutually_exclusive_group(required=False)
     group1.add_argument('--auto_velshift', action='store_true',
             help="Determine the velocity shift automatically")
-    group1.add_argument('--vlsr', nargs=1, type=float,
+    group1.add_argument('--vlsr', nargs='*', type=float,
             help="LSR velocity to shift spectral data in km/s")
+    try:
+        import astroSource.source as src
+        group1.add_argument('--source', action=src.LoadSourcefromConfig,
+                help="Source for the vlsr velocity")
+        group1.add_argument('--sources', nargs='*',
+                action=src.LoadSourcesfromConfig,
+                help="Sources for the vlsr velocity")
+        group1.add_argument('--atsources', nargs='*',
+                action=src.LoadSourcesfromConfig,
+                help="Shift velocity using the source position")
+    except ImportError:
+        pass
 
     return parser
 
+def common_maps():
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('--global_levels', action='store_true',
+            help='Use same levels for all plots')
+
+    return parser
 

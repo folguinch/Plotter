@@ -2,6 +2,7 @@ import argparse
 from builtins import zip
 
 from loaders import load_fits
+from parsers import common_maps
 from src.map_plotter import MapsPlotter
 from utils import all_mapfig_setup, plot_single_map, get_shape, get_overplots, get_axis_label
 
@@ -10,7 +11,7 @@ def plot_maps_parser():
     h = "Plot FITS maps"
 
     # Parser
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = argparse.ArgumentParser(add_help=False, parents=[common_maps()])
     parser.add_argument('--section', nargs=1, default=['maps_plots'],
             help="Section of the config file")
     parser.add_argument('--selflevels', action='store_true',
@@ -37,11 +38,17 @@ def plot_maps(args):
 
     # Iterate over images
     for i,(loc, img) in enumerate(zip(fig.axes, args.images)):
-        label = fig.get_value('axlabel', None, loc, sep=',')
+        label = fig.get_value('axlabel', '', loc, sep=',')
         label = get_axis_label(args, i, label)
         overplots = get_overplots(args, i)
+
+        # Recenter
+        ceni = cen[0] if len(cen)==1 else cen[i]
+        radiusi = radius[0] if len(radius)==1 else radius[i]
+
+        # Plot
         ax = plot_single_map(loc, fig, img, args.logger, contours=overplots, 
-                cen=cen, radius=radius, self_contours=args.selflevels, 
+                cen=ceni, radius=radiusi, self_contours=args.selflevels, 
                 cbar_orientation=orientation, markers=markers, axlabel=label)
 
     fig.auto_config(legend=args.legend)

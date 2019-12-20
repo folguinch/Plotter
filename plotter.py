@@ -8,6 +8,7 @@ from plot_channel_maps import plot_channel_maps_parser
 from plot_maps import plot_maps_parser
 from plot_moments import plot_moments_parser
 from plot_from_cube import plot_from_cube_parser
+from plot_data import plot_data_parser
 
 def main():
     # Evaluate parser functions
@@ -16,6 +17,7 @@ def main():
     subpar.update(plot_maps_parser())
     subpar.update(plot_moments_parser())
     subpar.update(plot_from_cube_parser())
+    subpar.update(plot_data_parser())
 
     # Command line options
     parser = argparse.ArgumentParser(description='Data plotting tools.',
