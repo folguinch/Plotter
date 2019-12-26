@@ -245,7 +245,13 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
         if not self_contours and 'levels' in fig.config:
             levels = map(float, 
                     fig.get_value('levels', ax=loc, sep=',').split())
-        contour_rms = float(fig.get_value('rms_contour', default=None, ax=loc))
+        try:
+            contour_rms = float(fig.get_value('rms_contour', default=None, 
+                ax=loc))
+        except TypeError:
+            logger.warn('rms_contour not in config file')
+            contour_rms = None
+
         plot_contours(ax, contours, levels=levels, nsigma=nsigma,
                 rms=contour_rms)
 
