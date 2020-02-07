@@ -1,9 +1,13 @@
-import os, math
+import argparse
+import math
+import os
+from configparser import ConfigParser
 
 import numpy as np
 import astropy.units as u
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
+import myutils.image_utils as myimg_utils
 
 from src.utils import auto_vminmax, auto_levels
 from src.logger import get_logger
@@ -16,13 +20,27 @@ def postprocess(fig, args):
         plotname = os.path.splitext(plotname)[0] + '.png'
         fig.savefig(plotname)
 
+def read_config(filename, parser=None):
+    # Check that file exists
+    if not os.path.isfile(filename):
+        raise IOError('%s does not exist' % filename)
+
+    # Create parser
+    if parser is None:
+        parser = ConfigParser()
+
+    # Read parser
+    parser.read(filename)
+
+    return parser
+
 def get_quantity(x):
     return _get_quantity(*tuple(x.split()))
 
 def _get_quantity(x,y):
     return float(x)*u.Unit(y)
 
-def get_shape(args, total, default_cols=3):
+def get_shape(args, total, default_cols=3, minimize=False):
     if args.shape:
         rows, cols = args.shape
     elif args.rows:
@@ -34,6 +52,12 @@ def get_shape(args, total, default_cols=3):
     else:
         cols = default_cols
         rows = math.ceil(float(total)/cols)
+
+    if minimize and int(cols*rows)>total:
+        newarg = argparse.ArgumentParser()
+        newarg.set_defaults(shape=None, rows=None)
+        newarg.add_argument('--cols', nargs=1, type=int, default=[default_cols])
+        rows, cols = get_shape(newarg.parse_args(['--cols', '%i' % cols]), total)
     
     return int(rows), int(cols)
 
@@ -149,6 +173,30 @@ def get_levels(data, loc, fig, levels=None, self_contours=True,
             pass
     return levels, self_contours
 
+def get_extent(img, loc, fig, logger):
+    # Get coordinate axes
+    xaxis, yaxis = myimg_utils.get_coord_axes(img)
+    xaxis = xaxis.to(u.arcsec).value
+    yaxis = yaxis.to(u.km/u.s).value
+
+    # Coodinate offset
+    try:
+        xoffset = float(fig.get_value('xoffset', default=None, ax=loc))
+        logger.info('Shifting x axis by: %f', xoffset)
+        xaxis = xaxis - offset
+    except TypeError:
+        xaxis = xaxis - xaxis[len(xaxis)//2]
+    try:
+        yoffset = float(fig.get_value('yoffset', default=None, ax=loc))
+        logger.info('Shifting x axis by: %f', yoffset)
+        yaxis = yaxis - offset
+    except TypeError:
+        yaxis = yaxis - yaxis[len(yaxis)//2]
+
+    # Extent
+    extent = [xaxis[0], xaxis[-1], yaxis[0], yaxis[-1]]
+    return extent
+
 def all_mapfig_setup(fig):
     # Center position
     cen, radius = get_center(fig)
@@ -191,8 +239,16 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
     # Data
     data = np.squeeze(img.data)
     unit = u.Unit(img.header['BUNIT'])
-    wcs = WCS(img.header).sub(('longitude','latitude'))
-    cbarlabel = '%s (%s)' % (dtype.capitalize(), unit.to_string('latex_inline'))
+    if dtype == 'pvmap':
+        wcs = None
+        extent = get_extent(img, loc, fig, logger)
+    else:
+        wcs = WCS(img.header).sub(('longitude','latitude'))
+        extent = None
+
+    # Colorbar label
+    realdtype = dtype if dtype!='pvmap' else 'intensity'
+    cbarlabel = '%s (%s)' % (realdtype.capitalize(), unit.to_string('latex_inline'))
     cbarlabel = fig.get_value('cbarlabel', cbarlabel, loc)
 
     # rms, nsigma
@@ -219,11 +275,6 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
             projection=wcs, include_cbar=kwargs.get('include_cbar'))
 
     # Levels
-    #levels, self_contours = get_levels(data, loc, fig, levels=levels,
-    #        self_contours=self_contours, dtype=dtype, logger=logger)
-    #logger.info('Levels: %r', levels)
-
-    # Levels
     if self_contours and global_levels and levels is None:
         levels = auto_levels(data, rms=rms, nsigma=nsigma)
     elif not self_contours and global_levels and levels is None:
@@ -238,7 +289,7 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
     # Plot data
     ax.plot_map(data, wcs=wcs, r=radius, position=cen, 
             self_contours=self_contours, levels=levels, rms=rms, nsigma=nsigma,
-            colors=lev_color, label=cbarlabel)
+            colors=lev_color, label=cbarlabel, extent=extent)
 
     # Plot contours
     if contours is not None:
