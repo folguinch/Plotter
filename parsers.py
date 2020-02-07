@@ -77,6 +77,8 @@ def common_maps():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('--global_levels', action='store_true',
             help='Use same levels for all plots')
+    parser.add_argument('--selflevels', action='store_true',
+            help='Plot contours from input image')
 
     return parser
 
