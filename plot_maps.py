@@ -14,15 +14,13 @@ def plot_maps_parser():
     parser = argparse.ArgumentParser(add_help=False, parents=[common_maps()])
     parser.add_argument('--section', nargs=1, default=['maps_plots'],
             help="Section of the config file")
-    parser.add_argument('--selflevels', action='store_true',
-            help='Plot contours from input image')
     parser.add_argument('imagenames', nargs='*',
             help="List of images to plot")
     parser.set_defaults(func=plot_maps, loaders=[load_fits])
 
     return {'plotmaps': (parser, h)}
 
-def plot_maps(args):
+def plot_maps(args, dtype='intensity'):
     # Keyword arguments for tile plotter
     opts = {}
     opts['nrows'], opts['ncols'] = get_shape(args, len(args.images),
@@ -49,8 +47,9 @@ def plot_maps(args):
         # Plot
         ax = plot_single_map(loc, fig, img, args.logger, contours=overplots, 
                 cen=ceni, radius=radiusi, self_contours=args.selflevels, 
-                cbar_orientation=orientation, markers=markers, axlabel=label)
+                cbar_orientation=orientation, markers=markers, axlabel=label,
+                dtype=dtype)
 
-    fig.auto_config(legend=args.legend)
+    fig.auto_config(legend=args.legend, dtype=dtype)
 
     return fig

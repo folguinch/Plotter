@@ -151,6 +151,7 @@ def _plot_moments(args, line):
                         skip_marker_label=args.moments.index(mom)>0,
                         axlabel=label)
 
+    fig.auto_plot()
     fig.auto_config()
 
     return fig
