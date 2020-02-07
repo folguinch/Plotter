@@ -22,6 +22,15 @@ def plot_from_cube_parser():
             help="Moments base file name")
     parser.add_argument('--line_list', nargs='*',
             help="Lines to plot (default all in config)")
+    group1 = parser.add_mutually_exclusive_group(required=True)
+    group1.add_argument('--vlsr', nargs=1, type=float,
+            help="LSR velocity to shift spectral data in km/s")
+    try:
+        import astroSource.source as src
+        group1.add_argument('--source', action=src.LoadSourcefromConfig,
+                help="Source to get the vlsr velocity")
+    except ImportError:
+        pass
     parser.add_argument('lineconfig', nargs=1,
             help="Configuration file of the desired lines")
     parser.add_argument('cubename', nargs=1,
@@ -74,7 +83,12 @@ def process_cube(cube, config, logger, filename=None, every=[1]):
 
     # Data needed from config
     logger.info('Extracting sub-cube:')
-    vlsr = get_quantity(config['vlsr'])
+    if args.vlsr:
+        vlsr = args.vlsr * u.km/u.s #get_quantity(config['vlsr'])
+    elif args.source is not None:
+        vlsr = args.source.get_quantity('vlsr')
+    else:
+        raise Exception('Could not find source vlsr')
     restfreq = get_quantity(config['freq'])
     chmin, chmax = map(int, config['chanran'].split())
     logger.info('Source v_LSR = %s', vlsr)
