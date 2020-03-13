@@ -227,7 +227,7 @@ def get_axis_label(args, n, detail):
     return label
 
 def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None, 
-        dtype='intensity', levels=None, self_contours=True,
+        dtype='intensity', levels=None, self_contours=True, nsigmalevel=None,
         global_levels=False, cbar_orientation=None, markers=None, 
         skip_marker_label=False, axlabel=None, **kwargs):
     # Change default self_contours
@@ -257,6 +257,12 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
     except TypeError:
         rms = None
     nsigma = float(fig.get_value('nsigma', default=5., ax=loc))
+    if nsigmalevel is None:
+        try:
+            nsigmalevel = int(fig.get_value('nsigmalevel', default=None,
+                ax=loc))
+        except TypeError:
+            pass
 
     # Get vmin and vmax
     if kwargs.get('vmin') is not None and kwargs.get('vmax') is not None:
@@ -286,25 +292,40 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
     lev_color = kwargs.get('contour_color', 
             fig.config.get('contour_color', fallback='w'))
 
+    # Contour line width
+    try:
+        linewidths = map(int, fig.get_value('linewidths', ax=loc,
+            sep=',').split())
+        if len(linewidths)==1:
+            linewidths = linewidths[0]
+    except (TypeError,AttributeError):
+        linewidths = None
+
     # Plot data
     ax.plot_map(data, wcs=wcs, r=radius, position=cen, 
             self_contours=self_contours, levels=levels, rms=rms, nsigma=nsigma,
-            colors=lev_color, label=cbarlabel, extent=extent)
+            nsigmalevel=nsigmalevel, colors=lev_color, label=cbarlabel, 
+            extent=extent, linewidths=linewidths)
 
     # Plot contours
     if contours is not None:
         if not self_contours and 'levels' in fig.config:
             levels = map(float, 
                     fig.get_value('levels', ax=loc, sep=',').split())
+        else:
+            levels = None
+
         try:
             contour_rms = float(fig.get_value('rms_contour', default=None, 
                 ax=loc))
         except TypeError:
             logger.warn('rms_contour not in config file')
             contour_rms = None
-
+        
+        # Plot
+        logger.info('Overplot contours: %s', levels)
         plot_contours(ax, contours, levels=levels, nsigma=nsigma,
-                rms=contour_rms)
+                rms=contour_rms, linewidths=linewidths)
 
     # Plot markers
     if markers is not None:
@@ -334,12 +355,13 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
 
     return ax
 
-def plot_contours(ax, contours, levels=None, nsigma=5., zorder=2, rms=None):
+def plot_contours(ax, contours, levels=None, nsigma=5., zorder=2, rms=None,
+        linewidths=None):
     for j,(img,opt) in enumerate(contours):
         data = np.squeeze(img.data)
         wcs = WCS(img.header).sub(('longitude','latitude'))
         ax.plot_contours(data, levels=levels, wcs=wcs, rms=rms, nsigma=nsigma, 
-                zorder=zorder+j, **opt)
+                zorder=zorder+j, linewidths=linewidths, **opt)
 
 def splot(loc, fig, data, logger, overplots=[], cols=[0,1], errorcol=None):
     # Axis

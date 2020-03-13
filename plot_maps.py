@@ -40,6 +40,13 @@ def plot_maps(args, dtype='intensity'):
         label = get_axis_label(args, i, label)
         overplots = get_overplots(args, i)
 
+        # Global color bar
+        if args.global_color and i>0:
+            orientation = None
+            cbar = False
+        else:
+            cbar = True
+
         # Recenter
         ceni = cen[0] if len(cen)==1 else cen[i]
         radiusi = radius[0] if len(radius)==1 else radius[i]
@@ -48,7 +55,7 @@ def plot_maps(args, dtype='intensity'):
         ax = plot_single_map(loc, fig, img, args.logger, contours=overplots, 
                 cen=ceni, radius=radiusi, self_contours=args.selflevels, 
                 cbar_orientation=orientation, markers=markers, axlabel=label,
-                dtype=dtype)
+                dtype=dtype, nsigmalevel=args.nsigmalevel[0], include_cbar=cbar)
 
     fig.auto_config(legend=args.legend, dtype=dtype)
 

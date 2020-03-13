@@ -233,6 +233,7 @@ def _plot_single_channel_maps(args):
         bmaj = args.cube.beams[i].major.to(u.deg).value
         bmin = args.cube.beams[i].minor.to(u.deg).value
         bpa = args.cube.beams[i].pa.to(u.deg).value
+        overplots = ut.get_overplots(args, i)
 
         if args.images is None or len(args.images) == 0:
             self_contours = True
@@ -259,7 +260,7 @@ def _plot_single_channel_maps(args):
                 radius=radius[0], self_contours=self_contours, levels=levels, 
                 cbar_orientation=orientation if cbar else None,
                 markers=markers, axlabel=label, vmin=vmin, vmax=vmax, 
-                include_cbar=cbar)
+                include_cbar=cbar, contours=overplots)
         if not self_contours:
             ut.plot_contours(ax, contours, levels, zorder=2)
 

@@ -77,8 +77,12 @@ def common_maps():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('--global_levels', action='store_true',
             help='Use same levels for all plots')
+    parser.add_argument('--global_color', action='store_true',
+            help='Plot only one color bar')
     parser.add_argument('--selflevels', action='store_true',
             help='Plot contours from input image')
+    parser.add_argument('--nsigmalevel', type=int, nargs=1, default=[None],
+            help='Plot a single  n*sigma level')
 
     return parser
 

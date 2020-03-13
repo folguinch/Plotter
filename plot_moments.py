@@ -101,6 +101,9 @@ def _plot_moments(args, line):
             img = utimg.moment(args.cube, mom, args.linecfg[line],
                     filename=filename)
 
+        # Overplots
+        overplots = ut.get_overplots(args, i)
+
         # Labels
         label = fig.get_value('axlabel', get_axlabel(mom), loc, sep=',')
         label = ut.get_axis_label(args, i, label)
@@ -110,8 +113,9 @@ def _plot_moments(args, line):
         radiusi = radius[0] if len(radius)==1 else radius[i]
         if mom != 1:
             ax = ut.plot_single_map(loc, fig, img, args.logger, cen=ceni,
-                    radius=radiusi, self_contours=mom==0, 
-                    cbar_orientation=orientation, markers=markers, 
+                    radius=radiusi, self_contours=mom==0 and overplots is None, 
+                    cbar_orientation=orientation, markers=markers,
+                    contours=overplots,
                     axlabel=label)
             if mom==0:
                 peak = np.unravel_index(np.nanargmax(np.squeeze(img.data)),
