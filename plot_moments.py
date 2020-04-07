@@ -66,7 +66,7 @@ def plot_moments(args):
         fig = _plot_moments(args, line)
 
         # Figure title
-        if args.linecfg:
+        if args.linecfg and 'title' in args.linecfg.options(line):
             fig.set_title(args.linecfg.get(line, 'title'))
         
         # Save fig

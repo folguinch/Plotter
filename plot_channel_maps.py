@@ -10,10 +10,10 @@ from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 
 import utils as ut
-from maths import quick_rms
 from loaders import load_cube, load_fits
 from parsers import common_lines
 from src.map_plotter import MapsPlotter
+from src.maths import quick_rms
 from src.utils import auto_vminmax, auto_levels
 
 def plot_channel_maps_parser():
