@@ -238,7 +238,11 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
     
     # Data
     data = np.squeeze(img.data)
-    unit = u.Unit(img.header['BUNIT'])
+    try:
+        unit = u.Unit(img.header['BUNIT'])
+    except KeyError:
+        logger.info('Unit not found')
+        unit = ''
     if dtype == 'pvmap':
         wcs = None
         extent = get_extent(img, loc, fig, logger)
@@ -248,7 +252,10 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
 
     # Colorbar label
     realdtype = dtype if dtype!='pvmap' else 'intensity'
-    cbarlabel = '%s (%s)' % (realdtype.capitalize(), unit.to_string('latex_inline'))
+    try:
+        cbarlabel = '%s (%s)' % (realdtype.capitalize(), unit.to_string('latex_inline'))
+    except AttributeError:
+        cbarlabel = '%s' % (realdtype.capitalize(),)
     cbarlabel = fig.get_value('cbarlabel', cbarlabel, loc)
 
     # rms, nsigma

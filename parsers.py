@@ -14,6 +14,8 @@ def global_parser():
             help='Automatic select axis labels')
     parser.add_argument('--legend', action='store_true',
             help='Plot legend')
+    #parser.add_argument('--withtitle', action='store_true',
+    #        help='Plot title from config files')
     parser.add_argument('--overplot', nargs='*', default=None,
             help="Overplot files (extension dependent)")
     parser.add_argument('--oplabel', metavar='LABEL', nargs='*', default=None,

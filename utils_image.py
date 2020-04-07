@@ -2,7 +2,7 @@ import astropy.units as u
 
 import logger
 import utils
-import maths
+import src.maths
 
 LOG = logger.get_logger(__name__)
 
