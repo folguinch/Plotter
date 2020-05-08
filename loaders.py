@@ -8,6 +8,7 @@ from myutils.array_utils import load_mixed_struct_array as data_loader
 #except ImportError:
 #    data_loader = np.loadtxt
 
+from utils_image import moment as get_moment
 from src.utils import auto_vminmax
 
 def load_cube(args):
@@ -79,7 +80,7 @@ def get_cube(filename):
 def get_dat(filename):
     return np.loadtxt(os.path.expanduser(filename))
 
-def get_spec_at_pos(cfg, cube):
+def get_spec_at_pos(cfg, cube, filename=None):
     # Options
     xunit = u.Unit(cfg.get('xunit', fallback=1))
     if 'vlsr' in cfg:
@@ -142,6 +143,13 @@ def get_spec_at_pos(cfg, cube):
         if xaxis.unit.is_equivalent(u.km/u.s) and vlsr is not None:
             xaxis = xaxis - vlsr
 
+    if filename:
+        with open(filename, 'w') as out:
+            out.write('#v\tF\n')
+            out.write('#{0.unit}\t{1.unit}\n'.format(xaxis, spec))
+            for dt in zip(xaxis, spec[:]):
+                out.write('{0.value:f}\t{1.value:f}\n'.format(*dt))
+
     return xaxis, spec
 
 # For multi plot
@@ -153,7 +161,26 @@ def multi_map(cfg):
 
 def multi_spectrum(cfg):
     data = get_cube(cfg['filename'])
-    data = get_spec_at_pos(cfg, data)
+    data = get_spec_at_pos(cfg, data, filename=cfg.get('outspec',
+        fallback=None))
     projection = 'rectilinear'
 
     return [data], projection
+
+def multi_moment_map(cfg):
+    mom = cfg.getint('moment')
+    if 'filename' in cfg and os.path.isfile(cfg['filename']):
+        data, projection = multi_map(cfg)
+        data = data[0][0]
+    else:
+        cube = get_cube(cfg['cubename'])
+        data = get_moment(cube, mom, cfg, filename=cfg.get('filename',
+            fallback=None))
+        projection = WCS(data.header).sub(['longitude','latitude'])
+    if mom==1 and 'vlsr' in cfg:
+        bunit = u.Unit(data.header['BUNIT'])
+        vlsr = cfg.getquantity('vlsr').to(bunit).value
+        data.data = data.data - vlsr
+
+    return [[data, projection]], projection
+
