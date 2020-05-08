@@ -2,13 +2,17 @@ import astropy.units as u
 
 import logger
 import utils
+
 import src.maths
 
 LOG = logger.get_logger(__name__)
 
 def moment(cube, mom, linecfg, filename=None):
     # Info from linecfg
-    restfreq = utils.get_quantity(linecfg['freq'])
+    try:
+        restfreq = utils.get_quantity(linecfg['freq'])
+    except:
+        restfreq = utils.get_quantity(linecfg['restfreq'])
     chmin, chmax = map(int, linecfg['chanran'].split())
     LOG.info('Extracting sub-cube:')
     LOG.info('Rest frequency = %s', restfreq)
@@ -36,6 +40,29 @@ def moment(cube, mom, linecfg, filename=None):
     if mom>0:
         if 'low' in linecfg:
             low = utils.get_quantity(linecfg['low'])
+            LOG.info('Using lower flux limit: %s', 
+                    '{0.value:.3f} {0.unit}'.format(low))
+            mask = subcube >= low
+        elif 'nsigma' in linecfg:
+            nsigma = float(linecfg['nsigma'])
+            if 'rms' in linecfg:
+                rms = utils.get_quantity(linecfg['rms'])
+                LOG.info('Using config rms: %s',
+                        '{0.value:.3e} {0.unit}'.format(rms))
+            elif 'RMS' in cube.header:
+                rms = cube.header['RMS'] * cube.unit
+                LOG.info('Using header rms: %s',
+                        '{0.value:.3e} {0.unit}'.format(rms))
+            else:
+                try:
+                    rms = src.maths.quick_rms(cube.unmasked_data)
+                except TypeError:
+                    rms = src.maths.quick_rms(cube.unmasked_data[:])
+                LOG.info('Using cube rms: %s',
+                        '{0.value:.3e} {0.unit}'.format(rms))
+            low = nsigma*rms
+            LOG.info('%isigma lower flux limit: %s', nsigma, 
+                    '{0.value:.3f} {0.unit}'.format(low))
             mask = subcube >= low
         else:
             mask = subcube.mask

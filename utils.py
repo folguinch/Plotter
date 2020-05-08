@@ -250,6 +250,18 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
         wcs = WCS(img.header).sub(('longitude','latitude'))
         extent = None
 
+    # Convert unit
+    if unit.to_string() == '':
+        unit = u.Unit(fig.get_value('put_unit', default=unit.to_string(),
+            ax=loc))
+    if unit.to_string() != '':
+        newunit = u.Unit(fig.get_value('unit', default=unit.to_string(),
+            ax=loc))
+        data = data * unit
+        data = data.to(newunit).value
+        unit = newunit
+    logger.info('Data unit: %r', unit)
+
     # Colorbar label
     realdtype = dtype if dtype!='pvmap' else 'intensity'
     try:
