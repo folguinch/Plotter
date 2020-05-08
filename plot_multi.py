@@ -33,11 +33,13 @@ def plot_multi(args):
 def get_loaders(cfg, args):
     aux = {}
     for section in cfg.sections():
-        if cfg[section]['type'] == 'map' or \
-                cfg[section]['type'] == 'contour_map':
+        ctype = cfg[section]['type']
+        if ctype in ['map', 'contour_map']:
             aux[section] = loaders.multi_map
-        elif cfg[section]['type'] == 'spectrum':
+        elif ctype == 'spectrum':
             aux[section] = loaders.multi_spectrum
+        elif ctype == 'moment':
+            aux[section] = loaders.multi_moment_map
         else:
             raise NotImplementedError
 

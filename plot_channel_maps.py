@@ -100,6 +100,8 @@ def plot_channel_maps(args):
     # Line config
     if args.lineconfig:
         linecfg = ut.read_config(args.lineconfig[0])
+    else:
+        linecfg = None
 
     # Selected lines
     if args.lines:
