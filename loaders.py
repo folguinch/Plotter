@@ -181,6 +181,9 @@ def multi_moment_map(cfg):
         bunit = u.Unit(data.header['BUNIT'])
         vlsr = cfg.getquantity('vlsr').to(bunit).value
         data.data = data.data - vlsr
+    elif mom==2 and cfg.get('stretch', fallback='linear').lower()=='log':
+        mask = data.data<=0.
+        data.data[mask] = float('nan')
 
     return [[data, projection]], projection
 

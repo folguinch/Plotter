@@ -37,8 +37,12 @@ def read_config(filename, parser=None):
 def get_quantity(x):
     return _get_quantity(*tuple(x.split()))
 
-def _get_quantity(x,y):
-    return float(x)*u.Unit(y)
+def _get_quantity(*args):
+    if len(args)==2:
+        x, y = args
+        return float(x)*u.Unit(y)
+    else:
+        return np.array(list(args[:-1]), dtype=float) * u.Unit(args[-1])
 
 def get_shape(args, total, default_cols=3, minimize=False):
     if args.shape:

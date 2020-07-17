@@ -41,7 +41,7 @@ def get_loaders(cfg, args):
         elif ctype == 'moment':
             aux[section] = loaders.multi_moment_map
         else:
-            raise NotImplementedError
+            raise NotImplementedError('No type: %s' % ctype)
 
     return aux
 

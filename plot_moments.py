@@ -90,6 +90,24 @@ def _plot_moments(args, line):
     # Iterate over images
     peak = None
     for i,(loc,mom) in enumerate(zip(fig.axes, args.moments)):
+        # vlsr
+        if args.vlsr is not None:
+            if len(args.vlsr)==1:
+                vlsr = args.vlsr[0]
+            else:
+                vlsr = args.vlsr[i]
+        elif args.sources is not None:
+            vlsr = args.sources[i].get_quantity('vlsr')
+        elif args.source is not None:
+            vlsr = args.source.get_quantity('vlsr')
+        elif args.atsources is not None:
+            vlsr = args.atsources[i].get_quantity('vlsr')
+        else:
+            vlsr = None
+        if vlsr is not None:
+            args.logger.info('Source vlsr = {0.value:.2f} {0.unit}'.format(
+                vlsr.to(u.km/u.s)))
+
         # Get image
         if args.images is not None:
             img = args.images[i]
@@ -98,7 +116,7 @@ def _plot_moments(args, line):
                 filename = args.momentbase[0]+'.%s.moment%i.fits' % (line,mom)
             else:
                 filename = None
-            img = utimg.moment(args.cube, mom, args.linecfg[line],
+            img = utimg.moment(args.cube, mom, args.linecfg[line], vlsr=vlsr,
                     filename=filename)
 
         # Overplots
@@ -124,23 +142,14 @@ def _plot_moments(args, line):
         else:
             if args.auto_velshift and peak is not None:
                 vel_shift = np.squeeze(img.data)[peak]
-            elif args.vlsr is not None:
-                if len(args.vlsr)==1:
-                    vel_shift = args.vlsr[0]
-                else:
-                    vel_shift = args.vlsr[i]
-            elif args.sources is not None:
-                vel_shift = args.sources[i].get_quantity('vlsr')
-                vel_shift = vel_shift.to(u.km/u.s).value
-            elif args.source is not None:
-                vel_shift = args.source.get_quantity('vlsr')
-                vel_shift = vel_shift.to(u.km/u.s).value
             elif args.atsources is not None:
                 wcs = WCS(img.header, naxis=['longitude','latitude'])
                 pos = args.atsources[i].position
                 pix = wcs.all_world2pix([[pos.ra.deg,pos.dec.deg]],0)[0]
                 pix = map(int, pix[::-1])
                 vel_shift = np.squeeze(img.data)[pix[0],pix[1]]
+            elif vlsr is not None:
+                vel_shift = vlsr
             else:
                 args.logger.warn('Could not find vlsr')
                 vel_shift = 0.
