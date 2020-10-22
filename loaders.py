@@ -157,6 +157,15 @@ def multi_map(cfg):
     data = get_fits(cfg['filename'])
     projection = WCS(data.header).sub(['longitude','latitude'])
     
+    # Scale data
+    if 'to_unit' in cfg:
+        to_unit = u.Unit(cfg['to_unit'])
+        data_unit = u.Unit(data.header['BUNIT'])
+        aux = data.data * data_unit
+        aux = aux.to(to_unit)
+        data.data = aux.value
+        data.header['BUNIT'] = to_unit.to_string('fits')
+
     return [[data, projection]], projection
 
 def multi_spectrum(cfg):
