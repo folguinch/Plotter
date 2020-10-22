@@ -98,7 +98,9 @@ def get_markers(fig):
     for i, m in enumerate(config.get('markers', fallback='').split(',')):
         if m == '':
             break
-        marker = {'loc':SkyCoord(m, unit=(u.hourangle, u.deg),frame='fk5')}
+        aux = m.split()
+        frame = aux[-1]
+        marker = {'loc':SkyCoord(aux[0], aux[1], unit=(u.hourangle, u.deg), frame=frame)}
         try:
             marker['style'] = config.get('mstyles', 
                     fallback='x').replace(',',' ').split()[i]
@@ -113,9 +115,15 @@ def get_markers(fig):
                 loclabel = config.get('mlabloc', 
                         fallback=None).split(',')
                 marker['labloc'] = SkyCoord(loclabel[i], unit=(u.hourangle,
-                    u.deg),frame='fk5')
+                    u.deg),frame='icrs')
             except (AttributeError, IndexError):
                 marker['labloc'] = marker['loc']
+            marker['font_weight'] = config.get('mfontweight',
+                    fallback='normal')
+            try:
+                marker['font_weight'] = int(marker['font_weight'])
+            except:
+                pass
         except AttributeError:
             pass
         except IndexError:
@@ -134,6 +142,34 @@ def get_markers(fig):
         markers += [marker]
 
     return markers
+
+def get_artists(fig):
+    config = fig.config
+    artists = {}
+
+    if 'arcs' in config:
+        artists['arcs'] = aux = {}
+        for i, arc in enumerate(config.get('arcs').split(',')):
+            aux['args'] = [tuple(map(float, arc.split())), 0, 0]
+            aux['kwargs'] = {}
+            for prop in ['height', 'width', 'angle', 'theta1', 'theta2',
+                    'linewidth', 'linestyle', 'color', 'zorder']:
+                key = 'arcs_%s' % prop
+                if key not in config:
+                    continue
+                if prop in ['color', 'linestyle']:
+                    val = config.get(key)
+                elif prop in ['zorder']:
+                    val = int(config.get(key))
+                else:
+                    val = float(config.get(key))
+                if prop == 'width':
+                    aux['args'][-2] = val
+                elif prop == 'height':
+                    aux['args'][-1] = val
+                else:
+                    aux['kwargs'][prop] = val
+    return artists
 
 def get_overplots(args, n):
     if args.overplots:
@@ -180,20 +216,24 @@ def get_levels(data, loc, fig, levels=None, self_contours=True,
 def get_extent(img, loc, fig, logger):
     # Get coordinate axes
     xaxis, yaxis = myimg_utils.get_coord_axes(img)
-    xaxis = xaxis.to(u.arcsec).value
-    yaxis = yaxis.to(u.km/u.s).value
+    try:
+        xaxis = xaxis.to(u.arcsec).value
+        yaxis = yaxis.to(u.km/u.s).value
+    except:
+        xaxis = xaxis.to(u.km/u.s).value
+        yaxis = yaxis.to(u.arcsec).value
 
     # Coodinate offset
     try:
         xoffset = float(fig.get_value('xoffset', default=None, ax=loc))
         logger.info('Shifting x axis by: %f', xoffset)
-        xaxis = xaxis - offset
+        xaxis = xaxis - xoffset
     except TypeError:
         xaxis = xaxis - xaxis[len(xaxis)//2]
     try:
         yoffset = float(fig.get_value('yoffset', default=None, ax=loc))
-        logger.info('Shifting x axis by: %f', yoffset)
-        yaxis = yaxis - offset
+        logger.info('Shifting y axis by: %f', yoffset)
+        yaxis = yaxis - yoffset
     except TypeError:
         yaxis = yaxis - yaxis[len(yaxis)//2]
 
@@ -211,7 +251,10 @@ def all_mapfig_setup(fig):
     # Markers
     markers = get_markers(fig)
 
-    return cen, radius, markers, orientation 
+    # Artists
+    artists = get_artists(fig)
+
+    return cen, radius, markers, artists, orientation 
 
 def get_axis_label(args, n, detail):
     label = '(' + chr(ord('a')+n) + ')'
@@ -233,7 +276,8 @@ def get_axis_label(args, n, detail):
 def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None, 
         dtype='intensity', levels=None, self_contours=True, nsigmalevel=None,
         global_levels=False, cbar_orientation=None, markers=None, 
-        skip_marker_label=False, axlabel=None, **kwargs):
+        skip_marker_label=False, axlabel=None, negative_rms_factor=None,
+        artists=None, **kwargs):
     # Change default self_contours
     if dtype=='velocity':
         self_contours = False
@@ -286,6 +330,12 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
                 ax=loc))
         except TypeError:
             pass
+    if negative_rms_factor is None:
+        try:
+            negative_rms_factor = float(fig.get_value('negative_rms_factor',
+                default=None, ax=loc))
+        except TypeError:
+            pass
 
     # Get vmin and vmax
     if kwargs.get('vmin') is not None and kwargs.get('vmax') is not None:
@@ -305,11 +355,13 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
 
     # Levels
     if self_contours and global_levels and levels is None:
-        levels = auto_levels(data, rms=rms, nsigma=nsigma)
+        levels = auto_levels(data, rms=rms, nsigma=nsigma,
+                negative_rms_factor=negative_rms_factor)
     elif not self_contours and global_levels and levels is None:
         nlevels = int(fig.get_value('nlevels', default=None, ax=loc))
         if rms is not None and nlevels is not None:
-            levels = auto_levels(rms=rms, nsigma=nsigma, nlevels=nlevels)
+            levels = auto_levels(rms=rms, nsigma=nsigma, nlevels=nlevels,
+                    negative_rms_factor=negative_rms_factor)
         else:
             raise Exception('Could not determine global levels for contours')
     lev_color = kwargs.get('contour_color', 
@@ -328,7 +380,8 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
     ax.plot_map(data, wcs=wcs, r=radius, position=cen, 
             self_contours=self_contours, levels=levels, rms=rms, nsigma=nsigma,
             nsigmalevel=nsigmalevel, colors=lev_color, label=cbarlabel, 
-            extent=extent, linewidths=linewidths)
+            extent=extent, linewidths=linewidths,
+            negative_rms_factor=negative_rms_factor)
 
     # Plot contours
     if contours is not None:
@@ -358,6 +411,11 @@ def plot_single_map(loc, fig, img, logger, contours=None, cen=None, radius=None,
     if fig.has_cbar(loc) and cbar_orientation is not None:
         ax.plot_cbar(fig.fig, orientation=cbar_orientation,
                 labelpad=fig.config.getfloat('labelpad', fallback=10))
+
+    # Other artists
+    if artists is not None:
+        if 'arcs' in artists:
+            ax.arc(*artists['arcs']['args'], **artists['arcs']['kwargs'])
 
     # Axis label
     if axlabel:

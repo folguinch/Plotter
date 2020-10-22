@@ -32,7 +32,7 @@ def plot_maps(args, dtype='intensity'):
     args.logger.debug('Initializing figure')
     fig = MapsPlotter(config=args.config[0], section=args.section[0],
             **opts)
-    cen, radius, markers, orientation = all_mapfig_setup(fig)
+    cen, radius, markers, artists, orientation = all_mapfig_setup(fig)
 
     # Iterate over images
     for i,(loc, img) in enumerate(zip(fig.axes, args.images)):
@@ -55,7 +55,8 @@ def plot_maps(args, dtype='intensity'):
         ax = plot_single_map(loc, fig, img, args.logger, contours=overplots, 
                 cen=ceni, radius=radiusi, self_contours=args.selflevels, 
                 cbar_orientation=orientation, markers=markers, axlabel=label,
-                dtype=dtype, nsigmalevel=args.nsigmalevel[0], include_cbar=cbar)
+                dtype=dtype, nsigmalevel=args.nsigmalevel[0],
+                include_cbar=cbar, artists=artists)
 
     fig.auto_config(legend=args.legend, dtype=dtype)
 

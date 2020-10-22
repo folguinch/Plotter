@@ -85,7 +85,7 @@ def _plot_moments(args, line):
     # Setup tile plotter
     fig = MapsPlotter(config=args.config[0], section=args.section[0],
             **opts)
-    cen, radius, markers, orientation = ut.all_mapfig_setup(fig)
+    cen, radius, markers, artists, orientation = ut.all_mapfig_setup(fig)
 
     # Iterate over images
     peak = None
@@ -93,9 +93,9 @@ def _plot_moments(args, line):
         # vlsr
         if args.vlsr is not None:
             if len(args.vlsr)==1:
-                vlsr = args.vlsr[0]
+                vlsr = args.vlsr[0] * u.km/u.s
             else:
-                vlsr = args.vlsr[i]
+                vlsr = args.vlsr[i] * u.km/u.s
         elif args.sources is not None:
             vlsr = args.sources[i].get_quantity('vlsr')
         elif args.source is not None:
@@ -149,7 +149,7 @@ def _plot_moments(args, line):
                 pix = map(int, pix[::-1])
                 vel_shift = np.squeeze(img.data)[pix[0],pix[1]]
             elif vlsr is not None:
-                vel_shift = vlsr
+                vel_shift = vlsr.value
             else:
                 args.logger.warn('Could not find vlsr')
                 vel_shift = 0.
